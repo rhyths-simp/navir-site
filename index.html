@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="description" content="navir — The keyboard-driven terminal file manager built for everyone. Zero dependencies. Pure speed."/>
+<title>navir — The terminal, finally made simple.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+
+/* ════════════════════════════════════════════════════════════════
+   RESET + TOKENS
+════════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Dark palette */
+  --dark:       #08090B;
+  --dark2:      #0F1012;
+  --dark3:      #161719;
+  --dark-card:  #111214;
+  --dark-bdr:   #232527;
+
+  /* Light palette */
+  --light:      #F4F1EB;
+  --light2:     #EDE9E1;
+  --light-bdr:  #DDD9D0;
+  --light-text: #1A1A1E;
+  --light-dim:  #6A6662;
+
+  /* Accent */
+  --gold:       #C8901E;
+  --gold-light: #E8A83E;
+  --gold-dim:   #7A5210;
+  --gold-glow:  rgba(200,144,30,0.12);
+  --teal:       #3B8FA0;
+  --teal-dim:   rgba(59,143,160,0.15);
+
+  /* Terminal colors */
+  --term-bg:    #060708;
+  --term-dir:   #4A9EAF;
+  --term-exec:  #5AAF72;
+  --term-arc:   #C8963A;
+  --term-plain: #9AACAC;
+  --term-sel:   #1E3A45;
+  --term-bar:   #1A3A48;
+
+  /* Type */
+  --serif:  'Playfair Display', Georgia, serif;
+  --mono:   'Space Mono', monospace;
+  --sans:   'Inter', system-ui, sans-serif;
+
+  /* Spacing */
+  --pad-x:  clamp(1.5rem, 6vw, 7rem);
+  --pad-y:  clamp(4rem, 8vw, 8rem);
+  --max-w:  1280px;
+}
+
+html { scroll-behavior: smooth; font-size: 16px; }
+
+body {
+  background: var(--dark);
+  color: #C8C4BC;
+  font-family: var(--sans);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   UTILITIES
+════════════════════════════════════════════════════════════════ */
+.container { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--pad-x); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+/* Reveal on scroll */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.visible { opacity: 1; transform: none; }
+.reveal.d1 { transition-delay: 0.1s; }
+.reveal.d2 { transition-delay: 0.2s; }
+.reveal.d3 { transition-delay: 0.3s; }
+.reveal.d4 { transition-delay: 0.4s; }
+
+/* ════════════════════════════════════════════════════════════════
+   NAVIGATION
+════════════════════════════════════════════════════════════════ */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 var(--pad-x); height: 60px;
+  background: rgba(8,9,11,0.82);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: border-color 0.3s;
+}
+nav.scrolled { border-bottom-color: var(--dark-bdr); }
+
+.nav-logo {
+  font-family: var(--mono); font-weight: 700; font-size: 1rem;
+  color: var(--gold-light); letter-spacing: -0.02em;
+  display: flex; align-items: center; gap: 0.5rem;
+  text-decoration: none;
+}
+.nav-logo .logo-mark { color: rgba(232,168,62,0.45); }
+
+.nav-center {
+  display: flex; gap: 2.5rem; list-style: none;
+  position: absolute; left: 50%; transform: translateX(-50%);
+}
+.nav-center a {
+  font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: #5A5E62; text-decoration: none;
+  transition: color 0.2s;
+}
+.nav-center a:hover { color: var(--gold-light); }
+
+.nav-cta {
+  font-family: var(--mono); font-size: 0.72rem; font-weight: 700;
+  color: var(--dark); background: var(--gold-light);
+  padding: 0.4rem 1rem; border-radius: 4px;
+  text-decoration: none; letter-spacing: 0.04em;
+  transition: opacity 0.2s, transform 0.15s;
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.nav-cta:hover { opacity: 0.88; transform: translateY(-1px); }
+
+/* ════════════════════════════════════════════════════════════════
+   HERO
+════════════════════════════════════════════════════════════════ */
+.hero {
+  min-height: 100svh;
+  display: grid; grid-template-columns: 1fr 1fr;
+  align-items: center; gap: clamp(2rem, 4vw, 5rem);
+  padding: calc(60px + clamp(3rem, 6vw, 5rem)) var(--pad-x) clamp(3rem, 6vw, 5rem);
+  max-width: var(--max-w); margin: 0 auto;
+}
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 0.6rem;
+  font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--gold);
+  border: 1px solid var(--gold-dim); border-radius: 100px;
+  padding: 0.3rem 0.85rem; margin-bottom: 1.5rem;
+}
+.hero-badge .pulse {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--gold);
+  animation: pulse 2s ease infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+
+.hero-title {
+  font-family: var(--serif); font-size: clamp(2.4rem, 4.5vw, 4rem);
+  font-weight: 700; line-height: 1.1; letter-spacing: -0.02em;
+  color: #EDE9E0; margin-bottom: 1.5rem;
+}
+.hero-title em { font-style: italic; color: var(--gold-light); }
+
+.hero-sub {
+  font-size: clamp(0.95rem, 1.5vw, 1.1rem); color: #6A7070;
+  max-width: 46ch; line-height: 1.8; margin-bottom: 2.5rem;
+}
+.hero-sub strong { color: #A0ACAC; font-weight: 500; }
+
+.hero-cmd-wrap {
+  display: flex; align-items: stretch; gap: 0;
+  background: var(--dark2); border: 1px solid var(--dark-bdr);
+  border-radius: 8px; overflow: hidden; margin-bottom: 1.25rem;
+  max-width: 480px;
+}
+.hero-cmd-prompt {
+  font-family: var(--mono); font-size: 0.75rem; color: var(--gold);
+  background: rgba(200,144,30,0.08); border-right: 1px solid var(--dark-bdr);
+  padding: 0.85rem 1rem; display: flex; align-items: center;
+  flex-shrink: 0;
+}
+.hero-cmd-text {
+  font-family: var(--mono); font-size: 0.72rem; color: var(--teal);
+  padding: 0.85rem 1rem; flex: 1; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center;
+}
+.hero-cmd-copy {
+  background: none; border: none; border-left: 1px solid var(--dark-bdr);
+  color: #4A5050; font-family: var(--mono); font-size: 0.65rem;
+  padding: 0.85rem 1.1rem; cursor: pointer; letter-spacing: 0.05em;
+  transition: color 0.2s, background 0.2s; flex-shrink: 0;
+}
+.hero-cmd-copy:hover { color: var(--gold); background: rgba(200,144,30,0.06); }
+
+.hero-meta {
+  display: flex; flex-wrap: wrap; gap: 1.5rem;
+  font-family: var(--mono); font-size: 0.66rem; color: #3A4444;
+}
+.hero-meta-item { display: flex; align-items: center; gap: 0.45rem; }
+.hero-meta-dot { width: 5px; height: 5px; border-radius: 50%; background: #5AAF72; }
+
+/* ════════════════════════════════════════════════════════════════
+   TERMINAL WINDOW
+════════════════════════════════════════════════════════════════ */
+.term-outer {
+  position: relative;
+}
+.term-outer::before {
+  content: '';
+  position: absolute; inset: -60px;
+  background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(200,144,30,0.07), transparent 70%);
+  pointer-events: none;
+}
+
+.term-window {
+  background: var(--term-bg); border: 1px solid #1E2224;
+  border-radius: 12px; overflow: hidden;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03);
+  font-family: var(--mono); font-size: clamp(0.66rem, 1.1vw, 0.76rem);
+  line-height: 1.6; position: relative;
+}
+/* scanline */
+.term-window::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: 12px;
+  background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 4px);
+}
+
+.tw-bar {
+  display: flex; align-items: center; gap: 0.45rem;
+  padding: 0.65rem 1rem; background: #0C0E10;
+  border-bottom: 1px solid #161819;
+}
+.tw-dot { width: 11px; height: 11px; border-radius: 50%; }
+.tw-dot.r { background: #C0554A; } .tw-dot.y { background: #C8963A; } .tw-dot.g { background: #5AAF72; }
+.tw-label { flex: 1; text-align: center; font-size: 0.63rem; color: #333A3A; }
+
+.tw-header {
+  background: var(--term-bar); color: #D0E0E4;
+  padding: 2px 12px; font-weight: 700; font-size: 0.72rem;
+}
+
+.tw-row {
+  padding: 1px 12px; display: flex; align-items: center;
+  transition: background 0.25s;
+}
+.tw-row.active { background: var(--term-sel); }
+
+.tw-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tw-size { color: #384444; min-width: 42px; text-align: right; font-size: 0.68rem; }
+.tw-tag {
+  font-size: 0.56rem; color: var(--gold); border: 1px solid var(--gold-dim);
+  padding: 0 3px; border-radius: 2px; margin-left: 4px;
+  opacity: 0; transition: opacity 0.3s;
+}
+.tw-row.active .tw-tag, .tw-row:has(.tw-tag):nth-child(6) .tw-tag { opacity: 1; }
+
+.tw-sep { height: 1px; background: #161819; margin: 1px 0; }
+
+.tw-hint {
+  background: var(--term-bar); color: #6A8A94;
+  padding: 2px 12px; font-size: 0.65rem; white-space: nowrap; overflow: hidden;
+}
+.tw-status {
+  padding: 2px 12px; font-size: 0.65rem; min-height: 1.6em;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.tw-status-dot { width: 5px; height: 5px; border-radius: 50; flex-shrink: 0; }
+.tw-status-dot.ok  { background: #5AAF72; }
+.tw-status-dot.inf { background: var(--teal); }
+.tw-cursor { display: inline-block; animation: blink 1.1s step-end infinite; color: var(--gold-light); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ════════════════════════════════════════════════════════════════
+   SECTION: FEAR REMOVAL  (light bg)
+════════════════════════════════════════════════════════════════ */
+.section-light {
+  background: var(--light);
+  color: var(--light-text);
+}
+
+.fears {
+  padding: var(--pad-y) var(--pad-x);
+  max-width: var(--max-w); margin: 0 auto;
+}
+
+.section-eyebrow {
+  font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.14em;
+  text-transform: uppercase; margin-bottom: 1rem;
+}
+.section-eyebrow.gold { color: var(--gold); }
+.section-eyebrow.teal { color: var(--teal); }
+.section-eyebrow.dark { color: var(--gold); }
+
+.fears-heading {
+  font-family: var(--serif); font-size: clamp(1.9rem, 3.5vw, 3rem);
+  font-weight: 700; color: var(--light-text); letter-spacing: -0.02em;
+  line-height: 1.15; margin-bottom: 1rem; max-width: 22ch;
+}
+.fears-heading em { font-style: italic; color: var(--gold); }
+
+.fears-sub {
+  font-size: 1rem; color: var(--light-dim); max-width: 52ch;
+  margin-bottom: 3.5rem; line-height: 1.75;
+}
+
+.fears-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5px;
+  border: 1.5px solid var(--light-bdr); border-radius: 12px; overflow: hidden;
+}
+
+.fear-card {
+  background: var(--light); padding: clamp(1.5rem, 3vw, 2.5rem);
+  border-right: 1.5px solid var(--light-bdr);
+  transition: background 0.2s;
+}
+.fear-card:last-child { border-right: none; }
+.fear-card:hover { background: var(--light2); }
+
+.fear-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: rgba(200,144,30,0.1); border: 1px solid rgba(200,144,30,0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; margin-bottom: 1.25rem;
+}
+
+.fear-title {
+  font-family: var(--serif); font-size: 1.2rem; font-weight: 700;
+  color: var(--light-text); margin-bottom: 0.6rem; line-height: 1.3;
+}
+
+.fear-body {
+  font-size: 0.9rem; color: var(--light-dim); line-height: 1.7;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SECTION: HOW IT WORKS (dark)
+════════════════════════════════════════════════════════════════ */
+.how {
+  padding: var(--pad-y) var(--pad-x);
+  max-width: var(--max-w); margin: 0 auto;
+}
+
+.how-head { margin-bottom: clamp(2.5rem, 5vw, 4rem); }
+
+.how-title {
+  font-family: var(--serif); font-size: clamp(1.9rem, 3.5vw, 3rem);
+  font-weight: 700; color: #EDE9E0; letter-spacing: -0.02em;
+  line-height: 1.15; margin-bottom: 0.75rem;
+}
+
+.how-sub { font-size: 0.95rem; color: #4A5555; max-width: 48ch; }
+
+.how-steps {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1px; background: var(--dark-bdr);
+  border: 1px solid var(--dark-bdr); border-radius: 12px; overflow: hidden;
+}
+
+.how-step {
+  background: var(--dark2); padding: clamp(1.5rem, 3vw, 2.25rem);
+  transition: background 0.2s;
+}
+.how-step:hover { background: var(--dark3); }
+
+.how-step-n {
+  font-family: var(--mono); font-size: 0.62rem; color: var(--gold-dim);
+  letter-spacing: 0.1em; margin-bottom: 1.5rem;
+}
+
+.how-step-cmd {
+  font-family: var(--mono); font-size: 0.8rem; color: var(--teal);
+  background: var(--dark); border: 1px solid var(--dark-bdr);
+  padding: 0.55rem 0.85rem; border-radius: 5px;
+  margin-bottom: 1.25rem; display: inline-block;
+}
+
+.how-step-title {
+  font-family: var(--serif); font-size: 1.15rem; font-weight: 600;
+  color: #D0CCCA; margin-bottom: 0.5rem; line-height: 1.3;
+}
+
+.how-step-body { font-size: 0.86rem; color: #4A5555; line-height: 1.7; }
+
+/* ════════════════════════════════════════════════════════════════
+   SECTION: SHORTCUTS (light)
+════════════════════════════════════════════════════════════════ */
+.keys-section {
+  padding: var(--pad-y) var(--pad-x);
+  max-width: var(--max-w); margin: 0 auto;
+}
+
+.keys-head {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  margin-bottom: 2.5rem; flex-wrap: wrap; gap: 1rem;
+}
+
+.keys-title {
+  font-family: var(--serif); font-size: clamp(1.8rem, 3vw, 2.6rem);
+  font-weight: 700; color: var(--light-text); letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.keys-note { font-size: 0.86rem; color: var(--light-dim); max-width: 36ch; text-align: right; }
+
+.keys-label {
+  font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--gold); margin: 2rem 0 0.85rem;
+}
+.keys-label:first-of-type { margin-top: 0; }
+
+.keys-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1px; background: var(--light-bdr);
+  border: 1px solid var(--light-bdr); border-radius: 10px; overflow: hidden;
+  margin-bottom: 0;
+}
+
+.key-item {
+  background: var(--light); padding: 0.9rem 1.1rem;
+  display: flex; align-items: center; gap: 0.85rem;
+  transition: background 0.15s;
+}
+.key-item:hover { background: var(--light2); }
+.key-item .kdesc { font-size: 0.84rem; color: var(--light-dim); flex: 1; }
+
+kbd {
+  font-family: var(--mono); font-size: 0.65rem; font-weight: 700;
+  color: var(--gold); background: rgba(200,144,30,0.1);
+  border: 1px solid rgba(200,144,30,0.3); padding: 0.2rem 0.5rem;
+  border-radius: 4px; white-space: nowrap; flex-shrink: 0;
+  box-shadow: 0 1px 0 rgba(200,144,30,0.2);
+}
+
+.keys-grid.advanced kbd { color: var(--teal); background: rgba(59,143,160,0.08); border-color: rgba(59,143,160,0.25); box-shadow: 0 1px 0 rgba(59,143,160,0.15); }
+.keys-grid.advanced .key-item:hover { background: #EDE9E1; }
+
+/* ════════════════════════════════════════════════════════════════
+   SECTION: RECYCLE BIN (dark)
+════════════════════════════════════════════════════════════════ */
+.recycle-section {
+  padding: var(--pad-y) var(--pad-x);
+}
+.recycle-inner {
+  max-width: var(--max-w); margin: 0 auto;
+  display: grid; grid-template-columns: 1fr 1fr; gap: clamp(2rem, 5vw, 5rem);
+  align-items: center;
+}
+
+.recycle-text .section-eyebrow { margin-bottom: 1rem; }
+
+.recycle-title {
+  font-family: var(--serif); font-size: clamp(1.8rem, 3vw, 2.6rem);
+  font-weight: 700; color: #EDE9E0; letter-spacing: -0.02em;
+  line-height: 1.15; margin-bottom: 1.25rem;
+}
+.recycle-title em { font-style: italic; color: var(--gold-light); }
+
+.recycle-body { font-size: 0.95rem; color: #4A5555; line-height: 1.8; margin-bottom: 1rem; }
+
+.recycle-restore {
+  display: flex; align-items: flex-start; gap: 0.85rem;
+  background: rgba(59,143,160,0.07); border: 1px solid rgba(59,143,160,0.18);
+  border-radius: 8px; padding: 1rem 1.25rem; margin-top: 1.75rem;
+}
+.rr-icon {
+  font-family: var(--mono); font-size: 0.6rem; color: var(--teal);
+  background: rgba(59,143,160,0.15); padding: 0.2rem 0.5rem;
+  border-radius: 3px; white-space: nowrap; margin-top: 0.1rem; flex-shrink: 0;
+}
+.rr-text { font-size: 0.84rem; color: #4A5555; }
+.rr-text code { font-family: var(--mono); color: var(--teal); font-size: 0.8em; }
+
+.recycle-visual {
+  background: var(--dark2); border: 1px solid var(--dark-bdr);
+  border-radius: 10px; overflow: hidden; font-family: var(--mono); font-size: 0.74rem;
+}
+
+.rv-bar {
+  background: var(--dark3); padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--dark-bdr); display: flex; align-items: center; gap: 0.5rem;
+}
+.rv-bar-icon { color: var(--gold); }
+.rv-bar-title { font-size: 0.68rem; color: #3A4444; }
+
+.rv-path { padding: 0.75rem 1rem 0.25rem; color: #3A4444; }
+.rv-path span { color: var(--gold); }
+
+.rv-file { padding: 2px 1rem; color: var(--teal); }
+.rv-file .rv-ts { color: var(--gold-dim); }
+
+.rv-footer {
+  padding: 0.6rem 1rem; border-top: 1px solid var(--dark-bdr); margin-top: 0.5rem;
+  font-size: 0.66rem; color: #2E3838;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.rv-footer-dot { width: 4px; height: 4px; border-radius: 50%; background: #5AAF72; flex-shrink: 0; }
+
+/* ════════════════════════════════════════════════════════════════
+   SECTION: PLUGINS (light)
+════════════════════════════════════════════════════════════════ */
+.plugins-section {
+  padding: var(--pad-y) var(--pad-x);
+  max-width: var(--max-w); margin: 0 auto;
+}
+
+.plugins-head { margin-bottom: clamp(2rem, 4vw, 3.5rem); }
+
+.plugins-title {
+  font-family: var(--serif); font-size: clamp(1.8rem, 3vw, 2.6rem);
+  font-weight: 700; color: var(--light-text); letter-spacing: -0.02em;
+  line-height: 1.15; margin-bottom: 0.75rem;
+}
+
+.plugins-sub { font-size: 0.95rem; color: var(--light-dim); max-width: 54ch; line-height: 1.75; }
+
+.plugins-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: clamp(1.5rem, 3vw, 3rem);
+  align-items: start;
+}
+
+.bundled-list { display: flex; flex-direction: column; gap: 0; }
+.bundled-item {
+  display: flex; align-items: center; gap: 1rem; padding: 1.1rem 0;
+  border-bottom: 1px solid var(--light-bdr);
+}
+.bundled-item:last-child { border-bottom: none; }
+.bundled-key {
+  font-family: var(--mono); font-size: 0.62rem; color: var(--gold);
+  background: rgba(200,144,30,0.1); border: 1px solid rgba(200,144,30,0.25);
+  padding: 0.18rem 0.5rem; border-radius: 4px; min-width: 62px;
+  text-align: center; flex-shrink: 0;
+}
+.bundled-info {}
+.bundled-name { font-size: 0.88rem; font-weight: 600; color: var(--light-text); margin-bottom: 0.1rem; }
+.bundled-desc { font-size: 0.81rem; color: var(--light-dim); }
+
+.code-card {
+  background: #0A0B0D; border: 1px solid #1E2022;
+  border-radius: 10px; overflow: hidden; font-family: var(--mono); font-size: 0.74rem; line-height: 1.75;
+}
+.cc-bar {
+  background: #0F1012; padding: 0.65rem 1rem;
+  border-bottom: 1px solid #1E2022;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.cc-bar-name { font-size: 0.65rem; color: #3A4444; }
+.cc-lang {
+  font-size: 0.6rem; color: var(--gold); background: rgba(200,144,30,0.1);
+  padding: 0.1rem 0.5rem; border-radius: 3px;
+}
+.cc-body { padding: 1.25rem 1.25rem; }
+.cc-line { display: block; }
+.ck  { color: #C792EA; }
+.cf  { color: #82AAFF; }
+.cs  { color: #C3E88D; }
+.ca  { color: var(--gold-light); }
+.cm  { color: #3A4A4A; font-style: italic; }
+.cp  { color: #C8C4BC; }
+
+.plugin-hint {
+  margin-top: 1.5rem; padding: 1rem 1.25rem;
+  background: rgba(200,144,30,0.07); border: 1px solid rgba(200,144,30,0.18);
+  border-radius: 8px; font-size: 0.84rem; color: var(--light-dim); line-height: 1.65;
+}
+.plugin-hint strong { color: var(--light-text); }
+
+/* ════════════════════════════════════════════════════════════════
+   SECTION: INSTALL CTA (dark)
+════════════════════════════════════════════════════════════════ */
+.install-section {
+  padding: var(--pad-y) var(--pad-x); text-align: center;
+  position: relative; overflow: hidden;
+}
+.install-section::before {
+  content: '';
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 600px; height: 400px;
+  background: radial-gradient(ellipse at center, rgba(200,144,30,0.07), transparent 70%);
+  pointer-events: none;
+}
+
+.install-inner { position: relative; max-width: var(--max-w); margin: 0 auto; }
+
+.install-title {
+  font-family: var(--serif); font-size: clamp(2rem, 4vw, 3.5rem);
+  font-weight: 700; color: #EDE9E0; letter-spacing: -0.025em;
+  line-height: 1.1; margin-bottom: 1rem;
+}
+.install-title em { font-style: italic; color: var(--gold-light); }
+
+.install-sub {
+  font-size: 1rem; color: #4A5555; max-width: 46ch;
+  margin: 0 auto 3rem; line-height: 1.8;
+}
+
+.install-cmd-big {
+  display: inline-flex; align-items: center; gap: 0;
+  background: var(--dark2); border: 1px solid var(--dark-bdr);
+  border-radius: 10px; overflow: hidden; margin: 0 auto 1.25rem;
+  max-width: 100%;
+}
+.icb-prompt {
+  font-family: var(--mono); font-size: 0.8rem; color: var(--gold);
+  background: rgba(200,144,30,0.08); border-right: 1px solid var(--dark-bdr);
+  padding: 1rem 1.1rem; flex-shrink: 0;
+}
+.icb-text {
+  font-family: var(--mono); font-size: 0.78rem; color: var(--teal);
+  padding: 1rem 1.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.icb-copy {
+  background: none; border: none; border-left: 1px solid var(--dark-bdr);
+  color: #3A4444; font-family: var(--mono); font-size: 0.68rem;
+  padding: 1rem 1.25rem; cursor: pointer; letter-spacing: 0.05em;
+  transition: all 0.2s; flex-shrink: 0;
+}
+.icb-copy:hover { color: var(--gold); background: rgba(200,144,30,0.06); }
+
+.install-note {
+  font-size: 0.82rem; color: #3A4444; margin-bottom: 3.5rem;
+}
+.install-note a { color: var(--teal); text-decoration: none; }
+.install-note a:hover { text-decoration: underline; }
+
+.install-steps-row {
+  display: flex; gap: 1px; max-width: 720px; margin: 0 auto;
+  background: var(--dark-bdr); border: 1px solid var(--dark-bdr);
+  border-radius: 10px; overflow: hidden;
+}
+.isr-item {
+  flex: 1; background: var(--dark2); padding: 1.25rem 1.25rem;
+  text-align: center;
+}
+.isr-num {
+  font-family: var(--mono); font-size: 0.58rem; color: var(--gold-dim);
+  letter-spacing: 0.1em; margin-bottom: 0.6rem;
+}
+.isr-cmd {
+  font-family: var(--mono); font-size: 0.74rem; color: var(--teal);
+  background: var(--dark); padding: 0.45rem 0.75rem; border-radius: 4px;
+  margin-bottom: 0.6rem; display: inline-block;
+}
+.isr-desc { font-size: 0.8rem; color: #3A4A4A; }
+
+.termux-note {
+  display: inline-flex; align-items: flex-start; gap: 0.85rem;
+  background: rgba(59,143,160,0.06); border: 1px solid rgba(59,143,160,0.18);
+  border-radius: 8px; padding: 1rem 1.25rem; margin-top: 2rem;
+  text-align: left; max-width: 480px;
+}
+.tn-badge {
+  font-family: var(--mono); font-size: 0.6rem; color: var(--teal);
+  background: rgba(59,143,160,0.15); padding: 0.2rem 0.5rem;
+  border-radius: 3px; white-space: nowrap; flex-shrink: 0; margin-top: 0.1rem;
+}
+.tn-text { font-size: 0.83rem; color: #4A5555; }
+.tn-text code { font-family: var(--mono); color: var(--teal); font-size: 0.85em; }
+
+/* ════════════════════════════════════════════════════════════════
+   FOOTER
+════════════════════════════════════════════════════════════════ */
+footer {
+  border-top: 1px solid var(--dark-bdr);
+  padding: 2.5rem var(--pad-x);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 1.5rem;
+}
+.footer-logo { font-family: var(--mono); font-size: 0.9rem; font-weight: 700; color: var(--gold); }
+.footer-links { display: flex; gap: 2rem; flex-wrap: wrap; }
+.footer-links a { font-family: var(--mono); font-size: 0.68rem; color: #3A4444; text-decoration: none; letter-spacing: 0.04em; transition: color 0.2s; }
+.footer-links a:hover { color: var(--gold); }
+.footer-copy { font-family: var(--mono); font-size: 0.65rem; color: #2A3030; }
+
+/* ════════════════════════════════════════════════════════════════
+   RESPONSIVE
+════════════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .hero { grid-template-columns: 1fr; min-height: auto; padding-top: calc(60px + 3rem); }
+  .term-outer::before { display: none; }
+  .how-steps { grid-template-columns: 1fr; }
+  .plugins-grid { grid-template-columns: 1fr; }
+  .recycle-inner { grid-template-columns: 1fr; }
+  .install-steps-row { flex-direction: column; }
+}
+
+@media (max-width: 768px) {
+  .nav-center { display: none; }
+  .fears-grid { grid-template-columns: 1fr; }
+  .fear-card { border-right: none; border-bottom: 1.5px solid var(--light-bdr); }
+  .fear-card:last-child { border-bottom: none; }
+  .keys-head { flex-direction: column; align-items: flex-start; }
+  .keys-note { text-align: left; }
+  .keys-grid { grid-template-columns: 1fr; }
+  footer { flex-direction: column; text-align: center; }
+  .footer-links { justify-content: center; }
+  .term-window { font-size: 0.65rem; }
+  .install-cmd-big { flex-direction: column; width: 100%; text-align: left; }
+  .icb-prompt, .icb-text, .icb-copy { border: none; border-bottom: 1px solid var(--dark-bdr); padding: 0.75rem 1rem; }
+  .icb-copy { border-bottom: none; }
+}
+
+@media (max-width: 420px) {
+  .hero-title { font-size: 2rem; }
+  .fears-heading { font-size: 1.7rem; }
+  .how-title { font-size: 1.7rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blink, .tw-cursor { animation: none; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .pulse { animation: none; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- ══════════════ NAV ══════════════ -->
+<nav id="nav">
+  <a href="#" class="nav-logo">◈ <span class="logo-mark">~/</span>navir</a>
+  <ul class="nav-center" aria-label="Main navigation">
+    <li><a href="#about">about</a></li>
+    <li><a href="#shortcuts">shortcuts</a></li>
+    <li><a href="#plugins">plugins</a></li>
+    <li><a href="#install">install</a></li>
+  </ul>
+  <a href="https://github.com/rhyths-simp/hacker-navir/tree/main" target="_blank" rel="noopener" class="nav-cta">
+    GitHub ↗
+  </a>
+</nav>
+
+<!-- ══════════════ HERO ══════════════ -->
+<section class="hero" aria-label="Hero">
+  <div class="hero-text">
+    <div class="hero-badge reveal">
+      <span class="pulse"></span>
+      Terminal File Manager
+    </div>
+    <h1 class="hero-title reveal d1">
+      The terminal,<br/><em>finally</em> made<br/>for everyone.
+    </h1>
+    <p class="hero-sub reveal d2">
+      navir is the keyboard-driven file manager that makes navigating your terminal feel as natural as using a desktop app — <strong>even if you've never touched a command line before.</strong>
+    </p>
+    <div class="hero-cmd-wrap reveal d3">
+      <span class="hero-cmd-prompt">$</span>
+      <span class="hero-cmd-text" id="hero-cmd">curl -fsSL https://raw.githubusercontent.com/rhyths-simp/hacker-navir/main/install.sh -o install.sh && bash install.sh</span>
+      <button class="hero-cmd-copy" onclick="copyCmd(this)" aria-label="Copy install command">copy</button>
+    </div>
+    <div class="hero-meta reveal d4">
+      <span class="hero-meta-item"><span class="hero-meta-dot"></span>Python 3.9+</span>
+      <span class="hero-meta-item">zero dependencies</span>
+      <span class="hero-meta-item">MIT license</span>
+      <span class="hero-meta-item">Linux · macOS · Termux</span>
+    </div>
+  </div>
+
+  <div class="term-outer reveal d2">
+    <div class="term-window" role="img" aria-label="navir terminal interface preview">
+      <div class="tw-bar">
+        <div class="tw-dot r"></div><div class="tw-dot y"></div><div class="tw-dot g"></div>
+        <span class="tw-label">navir — ~/projects</span>
+      </div>
+      <div class="tw-header"> navir &nbsp; ~/projects </div>
+
+      <div class="tw-row" id="tr0"><span class="tw-name" style="color:var(--term-dir)">assets/</span><span class="tw-size"></span></div>
+      <div class="tw-row" id="tr1"><span class="tw-name" style="color:var(--term-dir)">docs/</span><span class="tw-size"></span></div>
+      <div class="tw-row" id="tr2"><span class="tw-name" style="color:var(--term-dir)">src/</span><span class="tw-size"></span></div>
+      <div class="tw-row" id="tr3"><span class="tw-name" style="color:var(--term-dir)">tests/</span><span class="tw-size"></span></div>
+      <div class="tw-row" id="tr4">
+        <span class="tw-name" style="color:var(--term-arc)">backup.zip<span class="tw-tag">arc</span></span>
+        <span class="tw-size" style="color:var(--term-arc)">142K</span>
+      </div>
+      <div class="tw-row" id="tr5"><span class="tw-name" style="color:var(--term-exec)">build.sh</span><span class="tw-size">2K</span></div>
+      <div class="tw-row" id="tr6"><span class="tw-name" style="color:var(--term-plain)">CHANGELOG.md</span><span class="tw-size">8K</span></div>
+      <div class="tw-row" id="tr7"><span class="tw-name" style="color:var(--term-plain)">README.md</span><span class="tw-size">12K</span></div>
+
+      <div class="tw-sep"></div>
+      <div class="tw-hint"> /:search &nbsp; ^C:copy &nbsp; ^D:delete &nbsp; ^R:rename &nbsp; Q:quit</div>
+      <div class="tw-status" id="tw-status">
+        <span class="tw-cursor">█</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ FEAR REMOVAL ══════════════ -->
+<div class="section-light" id="about">
+  <div class="fears">
+    <p class="section-eyebrow gold reveal">designed for beginners</p>
+    <h2 class="fears-heading reveal d1">The thing that stopped you from using the terminal? <em>Gone.</em></h2>
+    <p class="fears-sub reveal d2">Most terminal tools assume you already know everything. navir assumes you know nothing — and that's completely fine. You'll be navigating files in under a minute.</p>
+    <div class="fears-grid">
+      <div class="fear-card reveal">
+        <div class="fear-icon">🗑️</div>
+        <h3 class="fear-title">"What if I delete something important?"</h3>
+        <p class="fear-body">Every deletion in navir goes to a safe recycle bin — zipped and timestamped, never permanently gone. Ctrl+D is the safest delete button you've ever pressed.</p>
+      </div>
+      <div class="fear-card reveal d1">
+        <div class="fear-icon">⌨️</div>
+        <h3 class="fear-title">"I'll never remember all these shortcuts."</h3>
+        <p class="fear-body">You don't have to. Start with five keys: arrows to move, Enter to open, Esc to go back, / to search, Q to quit. Everything else reveals itself as you need it.</p>
+      </div>
+      <div class="fear-card reveal d2">
+        <div class="fear-icon">⚡</div>
+        <h3 class="fear-title">"Setup sounds complicated."</h3>
+        <p class="fear-body">One curl command. That's the entire installation. No dependencies to install, no configuration files to edit, no Python packages to manage. It just works.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ HOW IT WORKS ══════════════ -->
+<section>
+  <div class="how">
+    <div class="how-head">
+      <p class="section-eyebrow teal reveal">how it works</p>
+      <h2 class="how-title reveal d1">Up and running in three steps.</h2>
+      <p class="how-sub reveal d2">No tutorials. No documentation to study. Just install, open, and start navigating.</p>
+    </div>
+    <div class="how-steps">
+      <div class="how-step reveal">
+        <div class="how-step-n">STEP 01 &nbsp;—&nbsp; INSTALL</div>
+        <code class="how-step-cmd">curl -fsSL .../install.sh | bash</code>
+        <h3 class="how-step-title">One command sets everything up.</h3>
+        <p class="how-step-body">Paste the install command into your terminal and press Enter. navir clones itself, creates the <code style="font-family:var(--mono);color:var(--teal);font-size:0.85em">navir</code> command, and sets up your personal plugin folder — in seconds.</p>
+      </div>
+      <div class="how-step reveal d1">
+        <div class="how-step-n">STEP 02 &nbsp;—&nbsp; LAUNCH</div>
+        <code class="how-step-cmd">navir</code>
+        <h3 class="how-step-title">Type navir. That's it.</h3>
+        <p class="how-step-body">Your files appear instantly. Use the arrow keys or W/S to move up and down. Press Enter to open a folder or file. Press Esc to go back. You already know how to use it.</p>
+      </div>
+      <div class="how-step reveal d2">
+        <div class="how-step-n">STEP 03 &nbsp;—&nbsp; EXPLORE</div>
+        <code class="how-step-cmd">Ctrl+T</code>
+        <h3 class="how-step-title">Discover more when you're ready.</h3>
+        <p class="how-step-body">Press Ctrl+T at any time to see a full menu of every available action. Copy, move, rename, search, preview — it's all there, discoverable, with no memorization required.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ SHORTCUTS ══════════════ -->
+<div class="section-light" id="shortcuts">
+  <div class="keys-section">
+    <div class="keys-head">
+      <div>
+        <p class="section-eyebrow dark reveal">keyboard shortcuts</p>
+        <h2 class="keys-title reveal d1">Every action.<br/>One hand.</h2>
+      </div>
+      <p class="keys-note reveal d2">Start with the essentials. The rest will become natural over time.</p>
+    </div>
+
+    <p class="keys-label reveal">Start here — the five you need</p>
+    <div class="keys-grid reveal d1">
+      <div class="key-item"><kbd>↑ ↓ / W S</kbd><span class="kdesc">Move up and down the file list</span></div>
+      <div class="key-item"><kbd>Enter</kbd><span class="kdesc">Open a file or step into a folder</span></div>
+      <div class="key-item"><kbd>Esc</kbd><span class="kdesc">Step back up to the parent folder</span></div>
+      <div class="key-item"><kbd>/</kbd><span class="kdesc">Live search — filter files as you type</span></div>
+      <div class="key-item"><kbd>Q</kbd><span class="kdesc">Quit navir</span></div>
+      <div class="key-item"><kbd>Ctrl+T</kbd><span class="kdesc">Context menu — all available actions</span></div>
+    </div>
+
+    <p class="keys-label reveal" style="margin-top:2rem">When you're comfortable</p>
+    <div class="keys-grid advanced reveal d1">
+      <div class="key-item"><kbd>Ctrl+C</kbd><span class="kdesc">Copy selected item</span></div>
+      <div class="key-item"><kbd>Ctrl+X</kbd><span class="kdesc">Cut — choose destination on paste</span></div>
+      <div class="key-item"><kbd>Ctrl+V</kbd><span class="kdesc">Paste or move to destination</span></div>
+      <div class="key-item"><kbd>Ctrl+D</kbd><span class="kdesc">Delete → safely to recycle bin</span></div>
+      <div class="key-item"><kbd>Ctrl+R</kbd><span class="kdesc">Rename selected item</span></div>
+      <div class="key-item"><kbd>Ctrl+N</kbd><span class="kdesc">Create a new file</span></div>
+      <div class="key-item"><kbd>Ctrl+F</kbd><span class="kdesc">Create a new folder</span></div>
+      <div class="key-item"><kbd>PgUp / PgDn</kbd><span class="kdesc">Jump 10 entries at a time</span></div>
+      <div class="key-item"><kbd>Ctrl+G</kbd><span class="kdesc">Git status (git plugin)</span></div>
+      <div class="key-item"><kbd>Ctrl+B</kbd><span class="kdesc">Bookmarks (bookmarks plugin)</span></div>
+      <div class="key-item"><kbd>Ctrl+P</kbd><span class="kdesc">File preview (preview plugin)</span></div>
+      <div class="key-item"><kbd>Ctrl+U</kbd><span class="kdesc">Archive manager (archive plugin)</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ RECYCLE BIN ══════════════ -->
+<section class="recycle-section">
+  <div class="recycle-inner">
+    <div class="recycle-text">
+      <p class="section-eyebrow gold reveal">the safety net</p>
+      <h2 class="recycle-title reveal d1">Delete anything.<br/><em>Regret nothing.</em></h2>
+      <p class="recycle-body reveal d2">When you press Ctrl+D in navir, your file doesn't disappear. It gets zipped into a timestamped archive and stored safely in your recycle bin. The original filename, folder structure, and every byte of data — preserved.</p>
+      <p class="recycle-body reveal d2">Accidentally deleted a whole project folder? No problem. It's sitting in <code style="font-family:var(--mono);color:var(--teal);font-size:0.85em">~/recycle_bin/</code> as a zip archive, exactly as it was.</p>
+      <div class="recycle-restore reveal d3">
+        <span class="rr-icon">restore</span>
+        <p class="rr-text">To recover anything: <code>cd ~/recycle_bin</code> then <code>unzip filename.zip</code>. Your files are back exactly as they were.</p>
+      </div>
+    </div>
+    <div class="reveal d2">
+      <div class="recycle-visual">
+        <div class="rv-bar">
+          <span class="rv-bar-icon">🗂</span>
+          <span class="rv-bar-title">~/recycle_bin/</span>
+        </div>
+        <div class="rv-path"><span>~/</span>recycle_bin/</div>
+        <div class="rv-file">old_config<span class="rv-ts">_20260601_091155.zip</span></div>
+        <div class="rv-file">report_draft<span class="rv-ts">_20260610_143022.zip</span></div>
+        <div class="rv-file">my_project<span class="rv-ts">_20260618_182347.zip</span></div>
+        <div class="rv-file">test_build<span class="rv-ts">_20260625_093811.zip</span></div>
+        <div class="rv-footer">
+          <span class="rv-footer-dot"></span>
+          4 items · all recoverable · nothing permanently lost
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ PLUGINS ══════════════ -->
+<div class="section-light" id="plugins">
+  <div class="plugins-section">
+    <div class="plugins-head">
+      <p class="section-eyebrow dark reveal">plugin system</p>
+      <h2 class="plugins-title reveal d1">Extend when you're ready.<br/>Never required to.</h2>
+      <p class="plugins-sub reveal d2">navir ships with three built-in plugins for git, bookmarks, and file preview. When you outgrow those, writing your own is as simple as dropping a Python file in a folder — no build step, no restart.</p>
+    </div>
+    <div class="plugins-grid">
+      <div class="reveal">
+        <div class="bundled-list">
+          <div class="bundled-item">
+            <span class="bundled-key">Ctrl+G</span>
+            <div class="bundled-info">
+              <div class="bundled-name">git_plugin</div>
+              <div class="bundled-desc">Live git status for the current folder. Branch name, modified files, untracked changes.</div>
+            </div>
+          </div>
+          <div class="bundled-item">
+            <span class="bundled-key">Ctrl+B</span>
+            <div class="bundled-info">
+              <div class="bundled-name">bookmarks_plugin</div>
+              <div class="bundled-desc">Save your most-visited folders and jump to them instantly. Persists across sessions.</div>
+            </div>
+          </div>
+          <div class="bundled-item">
+            <span class="bundled-key">Ctrl+P</span>
+            <div class="bundled-info">
+              <div class="bundled-name">preview_plugin</div>
+              <div class="bundled-desc">Peek inside any file without opening it. Shows text content, image dimensions, MIME types.</div>
+            </div>
+          </div>
+        </div>
+        <div class="plugin-hint reveal d1">
+          <strong>Writing your own plugin?</strong> Drop a <code style="font-family:var(--mono);font-size:0.85em">.py</code> file into <code style="font-family:var(--mono);font-size:0.85em">~/.navigator/plugins/</code> and it loads automatically on next start. Plugin errors are logged silently — a broken plugin can never crash the app.
+        </div>
+      </div>
+      <div class="reveal d1">
+        <div class="code-card">
+          <div class="cc-bar"><span class="cc-bar-name">my_plugin.py</span><span class="cc-lang">Python</span></div>
+          <div class="cc-body">
+<span class="cc-line"><span class="cm"># Drop into ~/.navigator/plugins/</span></span>
+<span class="cc-line"><span class="cm"># Loads on next navir start. That's it.</span></span>
+<span class="cc-line"> </span>
+<span class="cc-line"><span class="cp">NAME        = </span><span class="cs">"my_plugin"</span></span>
+<span class="cc-line"><span class="cp">VERSION     = </span><span class="cs">"1.0"</span></span>
+<span class="cc-line"><span class="cp">DESCRIPTION = </span><span class="cs">"Does something useful"</span></span>
+<span class="cc-line"> </span>
+<span class="cc-line"><span class="ck">def </span><span class="cf">register</span><span class="cp">(api):</span></span>
+<span class="cc-line">    <span class="cp">api.</span><span class="cf">add_keybind</span><span class="cp">(</span></span>
+<span class="cc-line">        <span class="cs">"Ctrl+E"</span><span class="cp">,</span></span>
+<span class="cc-line">        <span class="cs">"My Action"</span><span class="cp">,</span></span>
+<span class="cc-line">        <span class="cp">on_ctrl_e</span></span>
+<span class="cc-line">    <span class="cp">)</span></span>
+<span class="cc-line"> </span>
+<span class="cc-line"><span class="ck">def </span><span class="cf">on_ctrl_e</span><span class="cp">(api, path, item):</span></span>
+<span class="cc-line">    <span class="cp">api.</span><span class="cf">show_status</span><span class="cp">(</span></span>
+<span class="cc-line">        <span class="cs">f"Working on </span><span class="ca">{item}</span><span class="cs">!"</span></span>
+<span class="cc-line">    <span class="cp">)</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ INSTALL CTA ══════════════ -->
+<section class="install-section" id="install">
+  <div class="install-inner">
+    <p class="section-eyebrow gold reveal" style="margin-bottom:1rem">get started</p>
+    <h2 class="install-title reveal d1">One command.<br/><em>Infinite</em> speed.</h2>
+    <p class="install-sub reveal d2">No accounts. No configuration. No dependencies to manage. Paste this in your terminal and you're done.</p>
+
+    <div class="install-cmd-big reveal d2">
+      <span class="icb-prompt">$</span>
+      <span class="icb-text">curl -fsSL https://raw.githubusercontent.com/rhyths-simp/hacker-navir/main/install.sh -o install.sh && bash install.sh</span>
+      <button class="icb-copy" onclick="copyMain(this)" aria-label="Copy install command">copy</button>
+    </div>
+
+    <p class="install-note reveal d3">
+      Or browse the source on <a href="https://github.com/rhyths-simp/hacker-navir/tree/main" target="_blank" rel="noopener">GitHub ↗</a>
+    </p>
+
+    <div class="install-steps-row reveal d2">
+      <div class="isr-item">
+        <div class="isr-num">01 — INSTALL</div>
+        <code class="isr-cmd">curl ... | bash</code>
+        <p class="isr-desc">Installs navir and sets up the global command</p>
+      </div>
+      <div class="isr-item">
+        <div class="isr-num">02 — LAUNCH</div>
+        <code class="isr-cmd">navir</code>
+        <p class="isr-desc">Opens your home directory, ready to navigate</p>
+      </div>
+      <div class="isr-item">
+        <div class="isr-num">03 — UPDATE</div>
+        <code class="isr-cmd">navir --update</code>
+        <p class="isr-desc">Pulls latest version. Plugins untouched.</p>
+      </div>
+    </div>
+
+    <div class="reveal d3">
+      <div class="termux-note">
+        <span class="tn-badge">Termux</span>
+        <p class="tn-text">On Android with Termux? Install dependencies first: <code>pkg install python git</code> — then run the install command above. navir is fully Termux-native.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ FOOTER ══════════════ -->
+<footer>
+  <div class="footer-logo">◈ navir</div>
+  <nav class="footer-links" aria-label="Footer navigation">
+    <a href="https://github.com/rhyths-simp/hacker-navir/tree/main" target="_blank" rel="noopener">GitHub</a>
+    <a href="#about">About</a>
+    <a href="#shortcuts">Shortcuts</a>
+    <a href="#plugins">Plugins</a>
+    <a href="#install">Install</a>
+  </nav>
+  <p class="footer-copy">Built by rhyths-simp · MIT License</p>
+</footer>
+
+<script>
+/* ── Nav scroll state ── */
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 20);
+}, { passive: true });
+
+/* ── Reveal on scroll ── */
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+/* ── Terminal animation ── */
+const rows = Array.from({ length: 8 }, (_, i) => document.getElementById('tr' + i));
+const statusEl = document.getElementById('tw-status');
+let current = 0;
+
+const messages = [
+  { text: 'Recycled → backup_old_20260627.zip', dot: 'ok', show: 4 },
+  { text: 'Copied: build.sh', dot: 'ok', show: 5 },
+  { text: 'search: re', dot: 'inf', show: 2 },
+  { text: '⎇ main · 3 modified', dot: 'inf', show: 7 },
+  { text: '', dot: '', show: -1 },
+];
+let msgIdx = 0;
+
+function setStatus(msg) {
+  if (!msg.text) {
+    statusEl.innerHTML = '<span class="tw-cursor">█</span>';
+    return;
+  }
+  statusEl.innerHTML = `<span class="tw-status-dot ${msg.dot}"></span><span style="color:#4A5A5A;font-size:0.65rem">${msg.text}</span>`;
+}
+
+function tick() {
+  rows.forEach(r => r && r.classList.remove('active'));
+  if (rows[current]) rows[current].classList.add('active');
+
+  const msg = messages.find(m => m.show === current);
+  if (msg) setStatus(msg);
+  else setStatus({ text: '', dot: '' });
+
+  current = (current + 1) % rows.length;
+}
+
+tick();
+setInterval(tick, 900);
+
+/* ── Copy functions ── */
+const CMD = 'curl -fsSL https://raw.githubusercontent.com/rhyths-simp/hacker-navir/main/install.sh -o install.sh && bash install.sh';
+
+function copyCmd(btn) {
+  navigator.clipboard.writeText(CMD).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'copied!';
+    btn.style.color = '#5AAF72';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2000);
+  });
+}
+
+function copyMain(btn) {
+  navigator.clipboard.writeText(CMD).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'copied!';
+    btn.style.color = '#5AAF72';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2000);
+  });
+}
+</script>
+</body>
+</html>
